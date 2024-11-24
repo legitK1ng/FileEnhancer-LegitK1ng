@@ -10,13 +10,21 @@ def login():
     if request.method == 'POST':
         email = request.form.get('email')
         password = request.form.get('password')
+        remember = request.form.get('remember', False)
+        
+        if not email or not password:
+            return render_template('login.html', error="Please fill in all fields")
+            
         user = User.query.filter_by(email=email).first()
         
         if user and check_password_hash(user.password_hash, password):
-            login_user(user)
+            login_user(user, remember=remember)
+            next_page = request.args.get('next')
+            if next_page and next_page.startswith('/'):
+                return redirect(next_page)
             return redirect(url_for('files.index'))
             
-        return render_template('login.html', error="Invalid credentials")
+        return render_template('login.html', error="Invalid email or password")
     
     return render_template('login.html')
 
