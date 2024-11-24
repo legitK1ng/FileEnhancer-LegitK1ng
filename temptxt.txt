@@ -1,0 +1,922 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import { ArrowLeft, Settings, Plus, X, Zap, Folder, FileBox, Calendar, ChevronDown, ChevronUp, Link2 } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { usePlugins } from '../hooks/use-plugins';
+import { duplicateFinderPlugin } from '../lib/plugins/examples/duplicate-finder';
+import { customFiltersPlugin } from '../lib/plugins/examples/custom-filters';
+import { FileFilter } from '../lib/plugins/types';
+import { useIsMobile } from '../hooks/use-mobile';
+import { FolderPickerDialog } from './FolderPickerDialog';
+
+const FILTER_TYPES = {
+  DATE_MODIFIED: 'dateModified',
+  FILE_TYPE: 'fileType',
+  HAS_WORDS: 'hasWords',
+  HAS_WRITE_PERMISSION: 'hasWritePermission',
+  IN_SPECIFIC_FOLDER: 'inSpecificFolder',
+  NAME_CONTAINS: 'nameContains',
+  OWNED_BY: 'ownedBy',
+  SHARED_WITH: 'sharedWith',
+  SHARED_WITH_ME: 'sharedWithMe',
+  VISIBILITY: 'visibility'
+};
+
+interface FilterComponentProps {
+  type: string;
+  onRemove: () => void;
+  customFilter?: FileFilter;
+}
+
+const FilterComponent: React.FC<FilterComponentProps> = ({ type, onRemove, customFilter }) => {
+  const [value, setValue] = useState('');
+  const [showFolderPicker, setShowFolderPicker] = useState(false);
+  const [deviceType, setDeviceType] = useState('windows');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [minSize, setMinSize] = useState('');
+  const [maxSize, setMaxSize] = useState('');
+  const [selectedExtensions, setSelectedExtensions] = useState<string[]>([]);
+
+  useEffect(() => {
+    const ua = navigator.userAgent.toLowerCase();
+    if (ua.includes('android')) {
+      setDeviceType('android');
+    } else if (ua.includes('iphone') || ua.includes('ipad')) {
+      setDeviceType('ios');
+    }
+  }, []);
+
+  const handleFolderSelect = (path: string) => {
+    setValue(path);
+    setShowFolderPicker(false);
+  };
+
+  const renderCustomFilterInput = () => {
+    if (!customFilter) return null;
+
+    switch (customFilter.id) {
+      case 'size-filter':
+        return (
+          <div className="space-y-2">
+            <Input
+              type="number"
+              placeholder="Min size (bytes)"
+              value={minSize}
+              onChange={(e) => setMinSize(e.target.value)}
+            />
+            <Input
+              type="number"
+              placeholder="Max size (bytes)"
+              value={maxSize}
+              onChange={(e) => setMaxSize(e.target.value)}
+            />
+          </div>
+        );
+
+      case 'date-range-filter':
+        return (
+          <div className="space-y-2">
+            <Input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+            />
+            <Input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+            />
+          </div>
+        );
+
+      case 'extension-filter':
+        return (
+          <Select
+            onValueChange={(value) => {
+              setSelectedExtensions(prev =>
+                prev.includes(value)
+                  ? prev.filter(ext => ext !== value)
+                  : [...prev, value]
+              );
+            }}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select extensions" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="jpg">JPG</SelectItem>
+              <SelectItem value="png">PNG</SelectItem>
+              <SelectItem value="pdf">PDF</SelectItem>
+              <SelectItem value="doc">DOC</SelectItem>
+              <SelectItem value="txt">TXT</SelectItem>
+            </SelectContent>
+          </Select>
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  const renderFilterInput = () => {
+    if (customFilter) {
+      return renderCustomFilterInput();
+    }
+
+    switch (type) {
+      case FILTER_TYPES.DATE_MODIFIED:
+        return (
+          <div className="space-y-2">
+            <Input type="date" className="w-full" />
+            <Input type="date" className="w-full" placeholder="End date" />
+          </div>
+        );
+
+      case FILTER_TYPES.FILE_TYPE:
+        return (
+          <Select>
+            <SelectTrigger>
+              <SelectValue placeholder="Select file types" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="jpg">.jpg</SelectItem>
+              <SelectItem value="png">.png</SelectItem>
+              <SelectItem value="pdf">.pdf</SelectItem>
+              <SelectItem value="txt">.txt</SelectItem>
+            </SelectContent>
+          </Select>
+        );
+
+      case FILTER_TYPES.IN_SPECIFIC_FOLDER:
+        return (
+          <>
+            <Button
+              variant="outline"
+              className="w-full justify-start"
+              onClick={() => setShowFolderPicker(true)}
+            >
+              <Folder className="mr-2 h-4 w-4" />
+              {value || 'Choose Folder'}
+            </Button>
+            <FolderPickerDialog
+              isOpen={showFolderPicker}
+              onClose={() => setShowFolderPicker(false)}
+              onSelect={handleFolderSelect}
+              deviceType={deviceType}
+            />
+          </>
+        );
+
+      case FILTER_TYPES.HAS_WRITE_PERMISSION:
+      case FILTER_TYPES.SHARED_WITH_ME:
+        return <Checkbox />;
+
+      default:
+        return (
+          <Input
+            type="text"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            placeholder={`Enter ${type.replace(/([A-Z])/g, ' $1').toLowerCase()}`}
+          />
+        );
+    }
+  };
+
+  return (
+    <div className="flex items-start space-x-2 p-2 border rounded-md">
+      <div className="flex-grow space-y-1">
+        <div className="flex justify-between items-center">
+          <label className="text-sm font-medium">
+            {customFilter ? customFilter.name : type.replace(/([A-Z])/g, ' $1').toLowerCase()}
+          </label>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onRemove}
+            className="h-6 w-6 p-0"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+        {renderFilterInput()}
+      </div>
+    </div>
+  );
+};
+
+interface ActionOptionsPanelProps {
+  action: string;
+  options: Record<string, any>;
+  onOptionsChange: (options: Record<string, any>) => void;
+}
+
+const ActionOptionsPanel: React.FC<ActionOptionsPanelProps> = ({ action, options, onOptionsChange }) => {
+  const renderActionOptions = () => {
+    switch (action) {
+      case 'duplicates':
+        return (
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium">Similarity Threshold</label>
+              <Input
+                type="number"
+                min="0"
+                max="100"
+                value={options.similarityThreshold || 100}
+                onChange={(e) => onOptionsChange({ ...options, similarityThreshold: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Compare Method</label>
+              <Select
+                value={options.compareMethod || 'hash'}
+                onValueChange={(value) => onOptionsChange({ ...options, compareMethod: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select comparison method" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="hash">File Hash</SelectItem>
+                  <SelectItem value="content">Content</SelectItem>
+                  <SelectItem value="name">Name Only</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        );
+
+      case 'rename':
+        return (
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium">Pattern</label>
+              <Input
+                value={options.pattern || ''}
+                onChange={(e) => onOptionsChange({ ...options, pattern: e.target.value })}
+                placeholder="e.g., file_{n}"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Start Number</label>
+              <Input
+                type="number"
+                min="0"
+                value={options.startNumber || 1}
+                onChange={(e) => onOptionsChange({ ...options, startNumber: parseInt(e.target.value) })}
+              />
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="preserve-extension"
+                checked={options.preserveExtension}
+                onCheckedChange={(checked) => onOptionsChange({ ...options, preserveExtension: checked })}
+              />
+              <label htmlFor="preserve-extension" className="text-sm font-medium">
+                Preserve Extension
+              </label>
+            </div>
+          </div>
+        );
+
+      case 'flatten':
+        return (
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium">Target Folder</label>
+              <Input
+                value={options.targetFolder || ''}
+                onChange={(e) => onOptionsChange({ ...options, targetFolder: e.target.value })}
+                placeholder="Target folder path"
+              />
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="preserve-structure"
+                checked={options.preserveStructure}
+                onCheckedChange={(checked) => onOptionsChange({ ...options, preserveStructure: checked })}
+              />
+              <label htmlFor="preserve-structure" className="text-sm font-medium">
+                Preserve Folder Structure in Filename
+              </label>
+            </div>
+          </div>
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <div className="action-options-panel">
+      {renderActionOptions()}
+    </div>
+  );
+};
+
+const MenuInterface: React.FC<{ onAction: (action: string, filters: any[], options: any) => void }> = ({ onAction }) => {
+  const [selectedSource, setSelectedSource] = useState<string | null>(null);
+  const [setupStatus, setSetupStatus] = useState<string | null>(null);
+  const [selectedData, setSelectedData] = useState<boolean | null>(null);
+  const [activeFilters, setActiveFilters] = useState<string[]>([]);
+  const [selectedAction, setSelectedAction] = useState<string | null>(null);
+  const [showFilterSelect, setShowFilterSelect] = useState(false);
+  const { plugins, operations, filters, registerPlugin } = usePlugins();
+  const [activeCustomFilters, setActiveCustomFilters] = useState<FileFilter[]>([]);
+  const [actionOptions, setActionOptions] = useState<Record<string, Record<string, any>>>({});
+  const [expandedActions, setExpandedActions] = useState<string[]>([]);
+  const [isGoogleConnected, setIsGoogleConnected] = useState<boolean>(false);
+  const [apiError, setApiError] = useState<string | null>(null);
+  const isMobile = useIsMobile();
+
+  useEffect(() => {
+    // Register plugins
+    registerPlugin(duplicateFinderPlugin).catch(console.error);
+    registerPlugin(customFiltersPlugin).catch(console.error);
+  }, []);
+
+  const handleSetup = () => {
+    setSetupStatus('success');
+  };
+
+  const handleSourceSelect = (source: string) => {
+    setSelectedSource(source);
+    setSelectedData(null);
+    setActiveFilters([]);
+    setSelectedAction(null);
+    if (source === 'drive') {
+      setApiError(null); // Reset API error if source changes
+    }
+  };
+
+  const addFilter = (filterType: string) => {
+    if (!activeFilters.includes(filterType)) {
+      setActiveFilters([...activeFilters, filterType]);
+    }
+    setShowFilterSelect(false);
+  };
+
+  const removeFilter = (filterToRemove: string) => {
+    setActiveFilters(activeFilters.filter(filter => filter !== filterToRemove));
+  };
+
+  const addCustomFilter = (filter: FileFilter) => {
+    if (!activeCustomFilters.find(f => f.id === filter.id)) {
+      setActiveCustomFilters([...activeCustomFilters, filter]);
+    }
+    setShowFilterSelect(false);
+  };
+
+  const removeCustomFilter = (filterId: string) => {
+    setActiveCustomFilters(activeCustomFilters.filter(f => f.id !== filterId));
+  };
+
+  const toggleActionExpansion = (actionId: string) => {
+    setExpandedActions(prev =>
+      prev.includes(actionId)
+        ? prev.filter(id => id !== actionId)
+        : [...prev, actionId]
+    );
+  };
+
+  const handleActionOptionsChange = (actionId: string, options: Record<string, any>) => {
+    setActionOptions(prev => ({
+      ...prev,
+      [actionId]: options
+    }));
+  };
+
+  const handleGoogleSignInSuccess = useCallback(() => {
+    setIsGoogleConnected(true);
+    setApiError(null);
+  }, []);
+
+  const handleGoogleSignInFailure = useCallback((error: string) => {
+    setApiError(error);
+    setIsGoogleConnected(false);
+  }, []);
+
+  return (
+    <div className={`menu-interface-container ${isMobile ? 'mobile' : 'desktop'}`}>
+      <Card className="w-full max-w-3xl mx-auto">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="text-xl">File Management</CardTitle>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                className="bg-[#90EE90]"
+              >
+                {selectedSource ? <ArrowLeft className="h-5 w-5" /> : <Settings className="h-5 w-5" />}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem onClick={handleSetup}>Setup</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </CardHeader>
+
+        <CardContent className="space-y-4">
+          {setupStatus === 'success' && (
+            <Alert className="bg-[#90EE90] text-white">
+              <AlertDescription>Setup completed successfully!</AlertDescription>
+            </Alert>
+          )}
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">Source</label>
+              <Select onValueChange={handleSourceSelect}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Choose data source" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="local">Local Content</SelectItem>
+                  <SelectItem value="drive">Google Drive</SelectItem>
+                  <SelectItem value="url">URL Source</SelectItem>
+                  <SelectItem value="contacts" disabled>Google Contacts</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1">Select data</label>
+              {selectedSource === 'url' ? (
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <Input
+                      placeholder="Enter file URL"
+                      onChange={(e) => {
+                        const url = e.target.value;
+                        if (url) {
+                          fetch('/api/files/url', {
+                            method: 'POST',
+                            headers: {
+                              'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ url }),
+                          })
+                          .then(response => response.json())
+                          .then(() => {
+                            setSelectedData(true);
+                          })
+                          .catch(error => {
+                            console.error('Failed to add URL:', error);
+                          });
+                        }
+                      }}
+                    />
+                    <Button variant="outline" size="icon">
+                      <Link2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Enter a direct file URL to add it as a source
+                  </p>
+                </div>
+              ) : (
+                <Select
+                  disabled={!selectedSource}
+                  onValueChange={() => setSelectedData(true)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Choose parent folder" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="files">Files & folders</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+
+            {selectedSource === 'drive' && (
+              <div className="mt-2">
+                <p className="text-sm text-muted-foreground">
+                  Connect to your Google Drive to access files.
+                </p>
+                <span
+                  className={`cursor-pointer ${isGoogleConnected ? 'text-orange-500' : 'text-red-500'}`}
+                  onClick={() => !isGoogleConnected && setApiError(null)}
+                >
+                  {isGoogleConnected ? 'Connected' : 'Connect API'}
+                </span>
+                {apiError && (
+                  <span className="text-red-500 ml-2">
+                    {apiError}
+                  </span>
+                )}
+              </div>
+            )}
+
+            {!isGoogleConnected && selectedSource === 'drive' && (
+              <GoogleSignIn
+                onSuccess={handleGoogleSignInSuccess}
+                onFailure={handleGoogleSignInFailure}
+              />
+            )}
+
+            <div className="flex justify-between items-center mb-2">
+              <label className="block text-sm font-medium">Filters</label>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowFilterSelect(!showFilterSelect)}
+                disabled={!selectedData}
+              >
+                <Plus className="h
+      case 'rename':
+        return (
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium">Pattern</label>
+              <Input
+                value={options.pattern || ''}
+                onChange={(e) => onOptionsChange({ ...options, pattern: e.target.value })}
+                placeholder="e.g., file_{n}"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Start Number</label>
+              <Input
+                type="number"
+                min="0"
+                value={options.startNumber || 1}
+                onChange={(e) => onOptionsChange({ ...options, startNumber: parseInt(e.target.value) })}
+              />
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="preserve-extension"
+                checked={options.preserveExtension}
+                onCheckedChange={(checked) => onOptionsChange({ ...options, preserveExtension: checked })}
+              />
+              <label htmlFor="preserve-extension" className="text-sm font-medium">
+                Preserve Extension
+              </label>
+            </div>
+          </div>
+        );
+
+      case 'flatten':
+        return (
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium">Target Folder</label>
+              <Input
+                value={options.targetFolder || ''}
+                onChange={(e) => onOptionsChange({ ...options, targetFolder: e.target.value })}
+                placeholder="Target folder path"
+              />
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="preserve-structure"
+                checked={options.preserveStructure}
+                onCheckedChange={(checked) => onOptionsChange({ ...options, preserveStructure: checked })}
+              />
+              <label htmlFor="preserve-structure" className="text-sm font-medium">
+                Preserve Folder Structure in Filename
+              </label>
+            </div>
+          </div>
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <div className="action-options-panel">
+      {renderActionOptions()}
+    </div>
+  );
+};
+
+const MenuInterface: React.FC<{ onAction: (action: string, filters: any[], options: any) => void }> = ({ onAction }) => {
+  const [selectedSource, setSelectedSource] = useState<string | null>(null);
+  const [setupStatus, setSetupStatus] = useState<string | null>(null);
+  const [selectedData, setSelectedData] = useState<boolean | null>(null);
+  const [activeFilters, setActiveFilters] = useState<string[]>([]);
+  const [selectedAction, setSelectedAction] = useState<string | null>(null);
+  const [showFilterSelect, setShowFilterSelect] = useState(false);
+  const { plugins, operations, filters, registerPlugin } = usePlugins();
+  const [activeCustomFilters, setActiveCustomFilters] = useState<FileFilter[]>([]);
+  const [actionOptions, setActionOptions] = useState<Record<string, Record<string, any>>>({});
+  const [expandedActions, setExpandedActions] = useState<string[]>([]);
+  const isMobile = useIsMobile();
+
+  useEffect(() => {
+    // Register plugins
+    registerPlugin(duplicateFinderPlugin).catch(console.error);
+    registerPlugin(customFiltersPlugin).catch(console.error);
+  }, []);
+
+  const handleSetup = () => {
+    setSetupStatus('success');
+  };
+
+  const handleSourceSelect = (source: string) => {
+    setSelectedSource(source);
+    setSelectedData(null);
+    setActiveFilters([]);
+    setSelectedAction(null);
+  };
+
+  const addFilter = (filterType: string) => {
+    if (!activeFilters.includes(filterType)) {
+      setActiveFilters([...activeFilters, filterType]);
+    }
+    setShowFilterSelect(false);
+  };
+
+  const removeFilter = (filterToRemove: string) => {
+    setActiveFilters(activeFilters.filter(filter => filter !== filterToRemove));
+  };
+
+  const addCustomFilter = (filter: FileFilter) => {
+    if (!activeCustomFilters.find(f => f.id === filter.id)) {
+      setActiveCustomFilters([...activeCustomFilters, filter]);
+    }
+    setShowFilterSelect(false);
+  };
+
+  const removeCustomFilter = (filterId: string) => {
+    setActiveCustomFilters(activeCustomFilters.filter(f => f.id !== filterId));
+  };
+
+  const toggleActionExpansion = (actionId: string) => {
+    setExpandedActions(prev =>
+      prev.includes(actionId)
+        ? prev.filter(id => id !== actionId)
+        : [...prev, actionId]
+    );
+  };
+
+  const handleActionOptionsChange = (actionId: string, options: Record<string, any>) => {
+    setActionOptions(prev => ({
+      ...prev,
+      [actionId]: options
+    }));
+  };
+
+  return (
+    <div className={`menu-interface-container ${isMobile ? 'mobile' : 'desktop'}`}>
+      <Card className="w-full max-w-3xl mx-auto">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="text-xl">File Management</CardTitle>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                className="bg-[#90EE90]"
+              >
+                {selectedSource ? <ArrowLeft className="h-5 w-5" /> : <Settings className="h-5 w-5" />}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem onClick={handleSetup}>Setup</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </CardHeader>
+
+        <CardContent className="space-y-4">
+          {setupStatus === 'success' && (
+            <Alert className="bg-[#90EE90] text-white">
+              <AlertDescription>Setup completed successfully!</AlertDescription>
+            </Alert>
+          )}
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">Source</label>
+              <Select onValueChange={handleSourceSelect}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Choose data source" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="local">Local Content</SelectItem>
+                  <SelectItem value="drive">Google Drive</SelectItem>
+                  <SelectItem value="url">URL Source</SelectItem>
+                  <SelectItem value="contacts" disabled>Google Contacts</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1">Select data</label>
+              {selectedSource === 'url' ? (
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <Input
+                      placeholder="Enter file URL"
+                      onChange={(e) => {
+                        const url = e.target.value;
+                        if (url) {
+                          fetch('/api/files/url', {
+                            method: 'POST',
+                            headers: {
+                              'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ url }),
+                          })
+                          .then(response => response.json())
+                          .then(() => {
+                            setSelectedData(true);
+                          })
+                          .catch(error => {
+                            console.error('Failed to add URL:', error);
+                          });
+                        }
+                      }}
+                    />
+                    <Button variant="outline" size="icon">
+                      <Link2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Enter a direct file URL to add it as a source
+                  </p>
+                </div>
+              ) : (
+                <Select
+                  disabled={!selectedSource}
+                  onValueChange={() => setSelectedData(true)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Choose parent folder" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="files">Files & folders</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+
+            <div>
+              <div className="flex justify-between items-center mb-2">
+                <label className="block text-sm font-medium">Filters</label>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowFilterSelect(!showFilterSelect)}
+                  disabled={!selectedData}
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add Filter
+                </Button>
+              </div>
+
+              {showFilterSelect && (
+                <div className="border rounded-md p-2 mb-2 space-y-1">
+                  {Object.entries(FILTER_TYPES).map(([key, value]) => (
+                    <Button
+                      key={key}
+                      variant="ghost"
+                      className="w-full justify-start"
+                      onClick={() => addFilter(value)}
+                    >
+                      {value.replace(/([A-Z])/g, ' $1').toLowerCase()}
+                    </Button>
+                  ))}
+
+                  <div className="border-t my-2" />
+                  {filters.map((filter) => (
+                    <Button
+                      key={filter.id}
+                      variant="ghost"
+                      className="w-full justify-start"
+                      onClick={() => addCustomFilter(filter)}
+                    >
+                      {filter.name}
+                    </Button>
+                  ))}
+                </div>
+              )}
+
+              <div className="space-y-2">
+                {activeFilters.map((filter) => (
+                  <FilterComponent
+                    key={filter}
+                    type={filter}
+                    onRemove={() => removeFilter(filter)}
+                  />
+                ))}
+
+                {activeCustomFilters.map((filter) => (
+                  <FilterComponent
+                    key={filter.id}
+                    type={filter.id}
+                    customFilter={filter}
+                    onRemove={() => removeCustomFilter(filter.id)}
+                  />
+                ))}
+              </div>
+            </div>
+
+            <div className={`actions-section ${isMobile ? 'mobile' : 'desktop'}`}>
+              <div className="actions-main">
+                <label className="block text-sm font-medium mb-1">Actions</label>
+                <Select
+                  disabled={activeFilters.length === 0 && activeCustomFilters.length === 0}
+                  onValueChange={(value) => {
+                    setSelectedAction(value);
+                    if (!actionOptions[value]) {
+                      setActionOptions(prev => ({ ...prev, [value]: {} }));
+                    }
+                    if (!expandedActions.includes(value)) {
+                      toggleActionExpansion(value);
+                    }
+                  }}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select action" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {operations.map(op => (
+                      <SelectItem key={op.id} value={op.id}>
+                        {op.name}
+                      </SelectItem>
+                    ))}
+                    <SelectItem value="duplicates">Find & Manage Duplicates</SelectItem>
+                    <SelectItem value="rename">Bulk Rename</SelectItem>
+                    <SelectItem value="flatten">Folder Flattening</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                {selectedAction && (
+                  <div className="action-details mt-2">
+                    <div
+                      className="flex items-center justify-between cursor-pointer p-2 hover:bg-gray-50"
+                      onClick={() => toggleActionExpansion(selectedAction)}
+                    >
+                      <span className="text-sm font-medium">Action Options</span>
+                      {expandedActions.includes(selectedAction) ? (
+                        <ChevronUp className="h-4 w-4" />
+                      ) : (
+                        <ChevronDown className="h-4 w-4" />
+                      )}
+                    </div>
+
+                    {expandedActions.includes(selectedAction) && (
+                      <ScrollArea className="action-options-scroll-area">
+                        <ActionOptionsPanel
+                          action={selectedAction}
+                          options={actionOptions[selectedAction] || {}}
+                          onOptionsChange={(options) => handleActionOptionsChange(selectedAction, options)}
+                        />
+                      </ScrollArea>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <Button
+              className="w-full bg-green-500 hover:bg-green-600 text-white"
+              disabled={!selectedAction}
+              onClick={() => {
+                if (selectedAction) {
+                  const allFilters = [
+                    ...activeFilters,
+                    ...activeCustomFilters.map(f => ({ id: f.id, type: 'custom' }))
+                  ];
+                  onAction(selectedAction, allFilters, actionOptions[selectedAction] || {});
+                }
+              }}
+            >
+              <Zap className="mr-2 h-4 w-4" />
+              Preview & Run
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+export default MenuInterface;

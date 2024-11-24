@@ -1,0 +1,522 @@
+### setup.sh Script
+
+I intend to integrate these bash and Python scripts into a React frontend using fast API 
+At the very end is a detailed UI template (React)
+```bash
+#!/bin/bash
+
+# Set up the project directory
+PROJECT_DIR="project_folder"
+INPUT_FILES_DIR="$PROJECT_DIR/input_files"
+SCRIPTS_DIR="$PROJECT_DIR/scripts"
+MODELS_DIR="$PROJECT_DIR/models"
+OUTPUT_FILES_DIR="$PROJECT_DIR/output_files"
+LOGS_DIR="$PROJECT_DIR/logs"
+UI_DIR="$PROJECT_DIR/ui"
+
+# Create the directory structure
+mkdir -p "$INPUT_FILES_DIR/phone_calls"
+mkdir -p "$INPUT_FILES_DIR/com_nll_acr"
+mkdir -p "$SCRIPTS_DIR"
+mkdir -p "$MODELS_DIR"
+mkdir -p "$OUTPUT_FILES_DIR"
+mkdir -p "$LOGS_DIR"
+mkdir -p "$UI_DIR"
+
+# Create requirements.txt for backend
+cat <<EOL > "$PROJECT_DIR/requirements.txt"
+deepspeech
+pyaudioanalysis
+nltk
+spacy
+google-auth
+google-api-python-client
+EOL
+
+# Create a basic UI component
+cd "$UI_DIR"
+npx create-react-app .
+
+# Install frontend dependencies
+cd "$UI_DIR"
+npm install lucide-react @emotion/react @emotion/styled @mui/material
+
+# Create Python scripts
+cat <<EOL > "$SCRIPTS_DIR/process_string.py"
+import re
+
+def process_string(input_string: str) -> dict:
+    data = {
+        "_NAME": "",
+        "_PHONE": "",
+        "_DATE/TIME": "",
+        "_TYPE": "",
+        "_CONTENT": "",
+        "_CHOOSE_SPECIFIC_CONTACT": "",
+        "_FILE NAME": "",
+        "_FILE TYPE": ""
+    }
+
+    try:
+        if "facebook" in input_string.lower():
+            data["_FILE TYPE"] = "Facebook"
+        elif "whatsapp" in input_string.lower():
+            data["_FILE TYPE"] = "Text message"
+        elif "sms" in input_string.lower():
+            data["_FILE TYPE"] = "Text message"
+        elif ".html" in input_string.lower():
+            data["_FILE TYPE"] = "Call/.html"
+        else:
+            data["_FILE TYPE"] = "Call Record"
+
+        date_match = re.search(r'\\d{1,2}/\\d{1,2}/\\d{4}', input_string)
+        if date_match:
+            data["_DATE/TIME"] = date_match.group()
+
+        phone_match = re.search(r'\\+\\d{1}\\(\\d{3}\\)\\d{3}-\\d{4}', input_string)
+        if phone_match:
+            data["_PHONE"] = phone_match.group()
+
+        name_match = re.search(r'[A-Za-z]+ [A-Za-z]+', input_string)
+        if name_match:
+            data["_NAME"] = name_match.group()
+
+        return data
+    except Exception as e:
+        print(f"Error processing string: {e}")
+        return data
+EOL
+
+cat <<EOL > "$SCRIPTS_DIR/transcribe.py"
+import deepspeech
+
+def transcribe_audio_file(audio_data: bytes) -> str:
+    model = deepspeech.Model('models/deepspeech-0.9.3-models.pbmm')
+
+    try:
+        stream = model.createStream()
+        stream.feedAudioContent(audio_data)
+        transcript = stream.finish()
+        return transcript
+    except Exception as e:
+        print(f"Error transcribing audio data: {e}")
+        return ""
+EOL
+
+cat <<EOL > "$SCRIPTS_DIR/diarize.py"
+import pyaudioanalysis
+
+def diarize_speakers(audio_data: bytes) -> str:
+    try:
+        audio, sr = pyaudioanalysis.load_audio_file(audio_data)
+        diarization = pyaudioanalysis.diarize_speakers(audio, sr)
+        return ', '.join(str(x) for x in diarization)
+    except Exception as e:
+        print(f"Error diarizing speakers in audio data: {e}")
+        return ""
+EOL
+
+cat <<EOL > "$SCRIPTS_DIR/sentiment_analysis.py"
+import nltk
+from nltk.sentiment import SentimentIntensityAnalyzer
+
+nltk.download('vader_lexicon')
+sia = SentimentIntensityAnalyzer()
+
+def analyze_sentiment(transcript: str) -> dict:
+    try:
+        sentiment_scores = sia.polarity_scores(transcript)
+        return sentiment_scores
+    except Exception as e:
+        print(f"Error analyzing sentiment: {e}")
+        return {}
+EOL
+
+cat <<EOL > "$SCRIPTS_DIR/entity_extraction.py"
+import spacy
+
+nlp = spacy.load('en_core_web_sm')
+
+def extract_entities(transcript: str) -> str:
+    try:
+        doc = nlp(transcript)
+        entities = [(entity.text, entity.label_) for entity in doc.ents]
+        return ', '.join(f"{entity[0]} ({entity[1]})" for entity in entities)
+    except Exception as e:
+        print(f"Error extracting entities: {e}")
+        return ""
+EOL
+
+cat <<EOL > "$SCRIPTS_DIR/drive_access.py"
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseDownload
+import io
+
+def create_service_account_email(project_id: str) -> str:
+    try:
+        credentials = service_account.Credentials.from_service_account_file(
+            "service-account-key.json", scopes=['https://www.googleapis.com/auth/cloud-platform'])
+        service = build('iam', 'v1', credentials=credentials)
+
+        body = {
+            'parent': f'projects/{project_id}',
+            'serviceAccount': {
+                'email': f'service-account-{project_id}@iam.gserviceaccount.com'
+            },
+            'keyAlgorithm': 'KEY_ALGORITHM_RSA_2048',
+            'keySize': 2048
+        }
+
+        response = service.projects().serviceAccounts().create(body=body).execute()
+        service_account_email = response['email']
+
+        return service_account_email
+    except Exception as e:
+        print(f"Error creating service account email: {e}")
+        return None
+
+def create_service_account_key(project_id: str, service_account_email: str) -> None:
+    try:
+        credentials = service_account.Credentials.from_service_account_file(
+            "service-account-key.json", scopes=['https://www.googleapis.com/auth/cloud-platform'])
+        service = build('iam', 'v1', credentials=credentials)
+
+        body = {
+            'privateKeyData': {
+                'type': 'ServiceAccountPrivateKeyData',
+                'key': ''
+            },
+            'keyAlgorithm': 'KEY_ALGORITHM_RSA_2048',
+            'keySize': 2048,
+            'createServiceAccountKey': True,
+            'storeEncryptedKey': False
+        }
+
+        response = service.projects().serviceAccounts().keys().create(
+            body={'name': f'service-account-key', 'privateKeyType': 'RSA_2048'}, parent=f'projects/{project_id}/serviceAccounts/{service_account_email}').execute()
+        service_account_key = response['privateKeyData']['key']
+
+        with open('service-account-key.json', 'w') as f:
+            f.write(service_account_key)
+    except Exception as e:
+        print(f"Error creating service account key: {e}")
+
+def get_files_from_folder(folder_id: str) -> list:
+    try:
+        credentials = service_account.Credentials.from_service_account_file(
+            "service-account-key.json", scopes=['https://www.googleapis.com/auth/drive'])
+        service = build('drive', 'v3', credentials=credentials)
+        query = f"'{folder_id}' in parents"
+        results = service.files().list(q=query).execute()
+        items = results.get('files', [])
+        return items
+    except Exception as e:
+        print(f"Error getting files from folder: {e}")
+        return []
+
+def read_file(file_id: str) -> bytes:
+    try:
+        credentials = service_account.Credentials.from_service_account_file(
+            "service-account-key.json", scopes=['https://www.googleapis.com/auth/drive'])
+        service = build('drive', 'v3', credentials=credentials)
+        request = service.files().get_media(fileId=file_id)
+        file_data = io.BytesIO()
+        downloader = MediaIoBaseDownload(file_data, request)
+        done = False
+        while done is False:
+            status, done = downloader.next_chunk()
+        file_data.seek(0)
+        return file_data.read()
+    except Exception as e:
+        print(f"Error reading file: {e}")
+        return b''
+EOL
+
+cat <<EOL > "$SCRIPTS_DIR/main.py"
+import csv
+from datetime import datetime
+from transcribe import transcribe_audio_file
+from diarize import diarize_speakers
+from sentiment_analysis import analyze_sentiment
+from entity_extraction import extract_entities
+from process_string import process_string
+from drive_access import create_service_account_email, create_service_account_key, get_files_from_folder, read_file
+import os
+
+def main():
+    project_id = "your-project-id"
+
+    service_account_email = create_service_account_email(project_id)
+    create_service_account_key(project_id, service_account_email)
+# need a universal prompt to allow users selection connector for the native OS folder picker instead of hard coded folder id
+    phone_calls_folder_id = '1GAuyXm3TJvQjCm4msYr9rDG3yvheqwE2'
+    com_nll_acr_folder_id = '1HKmmab02331cFvr_EYSkeB14wVhdjFb'
+
+    try:
+        phone_calls_files = get_files_from_folder(phone_calls_folder_id)
+        com_nll_acr_files = get_files_from_folder(com_nll_acr_folder_id)
+
+        processed_data = []
+        for file in phone_calls_files + com_nll_acr_files:
+            try:
+                file_content = read_file(file['id']).decode('utf-8')
+                for line in file_content.splitlines():
+                    data = process_string(line.strip())
+                    audio_file_content = read_file(file['id'].replace('.txt',
+                                        audio_file_content = read_file(file['id'].replace('.txt', '.wav'))
+                    transcript = transcribe_audio_file(audio_file_content)
+                    diarization = diarize_speakers(audio_file_content)
+                    sentiment_scores = analyze_sentiment(transcript)
+                    entities = extract_entities(transcript)
+                    data["_CONTENT"] = transcript
+                    data["_CHOOSE_SPECIFIC_CONTACT"] = diarization
+                    processed_data.append(data)
+
+                    year = datetime.now().year
+                    year_folder = f"output_files /$year"
+
+                    output_file = f"{year_folder}/output_{file['name'].split('.')[0]}.csv"
+                    with open(output_file, 'w', newline='') as file:
+                        writer = csv.DictWriter(file, fieldnames=data.keys())
+                        writer.writeheader()
+                        writer.writerow(data)
+            except Exception as e:
+                log_error(f"Error processing file {file['name']}: {e}")
+
+        if not processed_data:
+            log_error(f"No files found to process.")
+
+    except Exception as e:
+        log_error(f"Error processing data: {e}")
+
+if __name__ == "__main__":
+    main()
+EOL
+
+# Install backend dependencies
+cd "$SCRIPTS_DIR"
+pip install -r requirements.txt
+
+# Run the backend script
+python main.py
+'''
+### Compartmentalized Scripts
+
+1. **transcribe.py**
+```python
+import deepspeech
+
+# Initialize DeepSpeech Model
+model = deepspeech.Model('deepspeech-0.9.3-models.pbmm')
+
+def transcribe_audio_file(audio_file: str) -> str:
+    """
+    Transcribe audio file using DeepSpeech
+    """
+    try:
+        stream = model.createStream()
+        with open(audio_file, 'rb') as f:
+            audio_data = f.read()
+        stream.feedAudioContent(audio_data)
+        transcript = stream.finish()
+        return transcript
+    except Exception as e:
+        print(f"Error transcribing audio file {audio_file}: {e}")
+        return ""
+```
+
+2. **diarize.py**
+```python
+import pyaudioanalysis
+
+def diarize_speakers(audio_file: str) -> str:
+    """
+    Diarize speakers in audio file using PyAudioAnalysis
+    """
+    try:
+        audio, sr = pyaudioanalysis.load_audio_file(audio_file)
+        diarization = pyaudioanalysis.diarize_speakers(audio, sr)
+        return ', '.join(str(x) for x in diarization)
+    except Exception as e:
+        print(f"Error diarizing speakers in audio file {audio_file}: {e}")
+        return ""
+```
+
+3. **sentiment_analysis.py**
+```python
+import nltk
+from nltk.sentiment import SentimentIntensityAnalyzer
+
+nltk.download('vader_lexicon')
+sia = SentimentIntensityAnalyzer()
+
+def analyze_sentiment(transcript: str) -> dict:
+    """
+    Analyze sentiment of transcript using NLTK
+    """
+    try:
+        sentiment_scores = sia.polarity_scores(transcript)
+        return sentiment_scores
+    except Exception as e:
+        print(f"Error analyzing sentiment: {e}")
+        return {}
+```
+
+4. **entity_extraction.py**
+```python
+import spacy
+
+nlp = spacy.load('en_core_web_sm')
+
+def extract_entities(transcript: str) -> str:
+    """
+    Extract entities from transcript using Spacy
+    """
+    try:
+        doc = nlp(transcript)
+        entities = [(entity.text, entity.label_) for entity in doc.ents]
+        return ', '.join(f"{entity[0]} ({entity[1]})" for entity in entities)
+    except Exception as e:
+        print(f"Error extracting entities: {e}")
+        return ""
+```
+
+5. **process_string.py**
+```python
+import re
+
+def process_string(input_string: str) -> dict:
+    """
+    Process input string to extract relevant information
+    """
+    data = {
+        "_NAME": "",
+        "_PHONE": "",
+        "_DATE/TIME": "",
+        "_TYPE": "",
+        "_CONTENT": "",
+        "_CHOOSE SPECIFIC CONTACT": "",
+        "_FILE NAME": "",
+        "_FILE TYPE": ""
+    }
+
+    try:
+        if "facebook" in input_string.lower():
+            data["_FILE TYPE"] = "Facebook"
+        elif "whatsapp" in input_string.lower():
+            data["_FILE TYPE"] = "Text message"
+        elif "sms" in input_string.lower():
+            data["_FILE TYPE"] = "Text message"
+        elif ".html" in input_string.lower():
+            data["_FILE TYPE"] = "Call/.html"
+        else:
+            data["_FILE TYPE"] = "Call Record"
+
+        date_match = re.search(r'\d{1,2}/\d{1,2}/\d{4}', input_string)
+        if date_match:
+            data["_DATE/TIME"] = date_match.group()
+
+        phone_match = re.search(r'\+\d{1}\(\d{3}\)\d{3}-\d{4}', input_string)
+        if phone_match:
+            data["_PHONE"] = phone_match.group()
+
+        name_match = re.search(r'[A-Za-z]+ [A-Za-z]+', input_string)
+        if name_match:
+            data["_NAME"] = name_match.group()
+
+        return data
+    except Exception as e:
+        print(f"Error processing string: {e}")
+        return data
+```
+
+6. **main.py**
+```python
+import os
+import csv
+from transcribe import transcribe_audio_file
+from diarize import diarize_speakers
+from sentiment_analysis import analyze_sentiment
+from entity_extraction import extract_entities
+from process_string import process_string
+
+def main():
+    """
+    Main function to process input files and write output to CSV
+    """
+    input_folder = 'input_files'
+    output_file = 'output.csv'
+
+    processed_data = []
+    for filename in os.listdir(input_folder):
+        try:
+            with open(os.path.join(input_folder, filename), 'r') as file:
+                for line in file:
+                    data = process_string(line.strip())
+                    audio_file = os.path.join(input_folder, filename.replace('.txt', '.wav'))
+                    transcript = transcribe_audio_file(audio_file)
+                    diarization = diarize_speakers(audio_file)
+                    sentiment_scores = analyze_sentiment(transcript)
+                    entities = extract_entities(transcript)
+                    data["_CONTENT"] = transcript
+                    data["_CHOOSE SPECIFIC CONTACT"] = diarization
+                    data["_FILE NAME"] = filename
+                    processed_data.append(data)
+        except Exception as e:
+            print(f"Error processing file {filename}: {e}")
+
+    try:
+        with open(output_file, 'w', newline='') as file:
+            writer = csv.DictWriter(file, fieldnames=processed_data[0].keys())
+            writer.writeheader()
+            writer.writerows(processed_data)
+    except Exception as e:
+        print(f"Error writing to output file {output_file}: {e}")
+
+if __name__ == "__main__":
+    main()
+```
+
+### Folder Structure Layout
+
+```
+project_folder/
+│
+├── input_files/
+│   └── (Place your input text and audio files here)
+│
+├── scripts/
+│   ├── transcribe.py
+│   ├── diarize.py
+│   ├── sentiment_analysis.py
+│   ├── entity_extraction.py
+│   ├── process_string.py
+│   └── main.py
+│
+├── models/
+│   └── deepspeech-0.9.3-models.pbmm
+│
+├── output/
+│   └── output.csv
+│
+└── logs/
+    └── (Log files will be stored here)
+```
+
+### Environment Setup Instructions
+
+1. **Install Dependencies**:
+   - Ensure you have Python installed.
+   - Install required libraries using pip:
+     ```bash
+     pip install deepspeech pyaudioanalysis nltk spacy
+     ```
+
+2. **Download Models**:
+   - Download the DeepSpeech model and place it in the `models` folder.
+   - Download the SpaCy model:
+     ```bash
+     python -m spacy download en_core_web_sm
+     ```
+'''

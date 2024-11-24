@@ -1,0 +1,142 @@
+Based on your setup and uploaded React UI, here’s a plan to integrate the Bash and Python backend with your React frontend using FastAPI as the bridge:
+
+---
+
+### **Integration Plan**
+
+#### 1. **Set Up the Backend with FastAPI**
+- **API Structure**:
+  - Expose the Python scripts' functionalities via endpoints.
+  - Example:
+    - `/process-string` for `process_string.py`
+    - `/transcribe-audio` for `transcribe.py`
+    - `/diarize` for `diarize.py`
+    - `/sentiment-analysis` for `sentiment_analysis.py`
+    - `/entity-extraction` for `entity_extraction.py`
+
+- **FastAPI Code Example**:
+  ```python
+  from fastapi import FastAPI, UploadFile, Form
+  from scripts.process_string import process_string
+  from scripts.transcribe import transcribe_audio_file
+  from scripts.diarize import diarize_speakers
+  from scripts.sentiment_analysis import analyze_sentiment
+  from scripts.entity_extraction import extract_entities
+
+  app = FastAPI()
+
+  @app.post("/process-string")
+  async def process_string_api(input_string: str = Form(...)):
+      return process_string(input_string)
+
+  @app.post("/transcribe-audio")
+  async def transcribe_audio(file: UploadFile):
+      audio_data = await file.read()
+      return {"transcript": transcribe_audio_file(audio_data)}
+
+  @app.post("/diarize")
+  async def diarize_audio(file: UploadFile):
+      audio_data = await file.read()
+      return {"diarization": diarize_speakers(audio_data)}
+
+  @app.post("/sentiment-analysis")
+  async def sentiment_analysis_api(transcript: str = Form(...)):
+      return analyze_sentiment(transcript)
+
+  @app.post("/entity-extraction")
+  async def entity_extraction_api(transcript: str = Form(...)):
+      return extract_entities(transcript)
+  ```
+
+- **Running FastAPI**:
+  - Use `uvicorn` to start the server:
+    ```bash
+    uvicorn main:app --reload --host 0.0.0.0 --port 8000
+    ```
+
+#### 2. **Connect the React Frontend to FastAPI**
+- Utilize `axios` or `fetch` for making HTTP requests to FastAPI.
+- Example integration:
+  ```javascript
+  import axios from 'axios';
+
+  const processString = async (inputString) => {
+    try {
+      const response = await axios.post('http://localhost:8000/process-string', { input_string: inputString });
+      return response.data;
+    } catch (error) {
+      console.error('Error processing string:', error);
+    }
+  };
+
+  const transcribeAudio = async (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    try {
+      const response = await axios.post('http://localhost:8000/transcribe-audio', formData);
+      return response.data;
+    } catch (error) {
+      console.error('Error transcribing audio:', error);
+    }
+  };
+  ```
+
+#### 3. **Modify React UI to Add Backend Integration**
+- Update components in your uploaded React UI (e.g., `MenuInterface`) to make API calls.
+- Example integration with a button:
+  ```javascript
+  const handleProcessString = async () => {
+    const result = await processString("Sample input string");
+    console.log(result);
+  };
+
+  <Button onClick={handleProcessString}>Process String</Button>
+  ```
+
+- Similarly, connect the rest of the API endpoints to their respective UI functionalities.
+
+#### 4. **Manage File Uploads in React**
+- Use `<input type="file" />` for file selection and `FormData` to send files.
+- Example:
+  ```javascript
+  const handleFileUpload = async (event) => {
+    const file = event.target.files[0];
+    const result = await transcribeAudio(file);
+    console.log(result);
+  };
+
+  <input type="file" onChange={handleFileUpload} />
+  ```
+
+#### 5. **Dynamic Folder Management**
+- Incorporate the `FolderPickerDialog` in your UI for selecting local or Google Drive folders.
+- Update the API to handle folder structure as needed.
+
+---
+
+### **Updated Folder Structure**
+
+```
+project_folder/
+│
+├── input_files/
+├── scripts/           # Python scripts
+├── models/            # Pre-trained models
+├── output_files/      # Generated outputs
+├── logs/
+├── ui/                # React frontend
+├── backend/           # FastAPI backend
+│   ├── main.py        # FastAPI app
+│   ├── endpoints/     # Endpoint-specific modules
+│   └── requirements.txt
+└── Dockerfile         # Optional containerization
+```
+
+---
+
+### **Future Enhancements**
+- **Authentication**: Add OAuth for Google Drive/Contacts integration.
+- **Deployment**: Use Docker to containerize and deploy the full stack.
+- **Testing**: Integrate automated testing with tools like Postman for APIs and Jest for the frontend.
+
+Let me know if you need detailed code for any specific part!
