@@ -39,3 +39,26 @@ canvas {
     margin: 1rem 0;
     border-radius: 0.25rem;
 }
+/* Upload zone styles */
+.upload-zone {
+    border: 2px dashed var(--bs-border-color);
+    transition: all 0.3s ease;
+}
+
+.upload-zone.dragover {
+    border-color: var(--bs-primary);
+    background-color: rgba(var(--bs-primary-rgb), 0.1);
+}
+
+.progress-wrapper {
+    margin-bottom: 0.5rem;
+    padding: 0.5rem;
+    background-color: var(--bs-dark);
+    border: 1px solid var(--bs-border-color);
+    border-radius: 0.25rem;
+}
+
+.progress-wrapper .progress {
+    height: 0.5rem;
+    margin-top: 0.5rem;
+}

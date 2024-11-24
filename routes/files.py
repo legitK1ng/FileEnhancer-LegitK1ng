@@ -52,12 +52,29 @@ def upload_file():
         unique_filename = f"{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}_{filename}"
         filepath = os.path.join(upload_dir, unique_filename)
         
-        # Check file size (limit to 50MB)
+        # Check file size (limit to 200MB)
         file.seek(0, os.SEEK_END)
         size = file.tell()
-        if size > 50 * 1024 * 1024:  # 50MB in bytes
-            return jsonify({'error': 'File size exceeds 50MB limit'}), 400
+        if size > 200 * 1024 * 1024:  # 200MB in bytes
+            return jsonify({'error': 'File size exceeds 200MB limit'}), 400
         file.seek(0)
+        
+        # Validate file content
+        if file.filename.lower().endswith(('.txt', '.pdf')):
+            try:
+                content = file.read(1024)  # Read first 1KB to validate
+                file.seek(0)
+                content.decode('utf-8')  # Try to decode as text
+            except UnicodeDecodeError:
+                return jsonify({'error': 'Invalid text file encoding'}), 400
+        elif file.filename.lower().endswith(('.wav', '.mp3', '.amr')):
+            try:
+                content = file.read(44)  # Read header
+                file.seek(0)
+                if not any(content.startswith(header) for header in [b'RIFF', b'ID3', b'#!AMR']):
+                    return jsonify({'error': 'Invalid audio file format'}), 400
+            except Exception:
+                return jsonify({'error': 'Invalid audio file'}), 400
         
         # Save file
         try:

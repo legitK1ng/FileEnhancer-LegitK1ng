@@ -27,21 +27,103 @@ document.addEventListener('DOMContentLoaded', function() {
             });
     }
 
+    // Add drag and drop support
+    const dropZone = document.querySelector('.upload-zone');
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, preventDefaults, false);
+    });
+
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => {
+            dropZone.classList.add('dragover');
+        });
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => {
+            dropZone.classList.remove('dragover');
+        });
+    });
+
+    dropZone.addEventListener('drop', handleDrop);
+
+    function handleDrop(e) {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        handleFiles(files);
+    }
+
+    function handleFiles(files) {
+        [...files].forEach(uploadFile);
+    }
+
+    async function uploadFile(file) {
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        // Create progress bar
+        const progressBar = createProgressBar(file.name);
+        
+        try {
+            const response = await fetch('/api/files', {
+                method: 'POST',
+                body: formData,
+                onUploadProgress: (progressEvent) => {
+                    const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+                    updateProgress(progressBar, percentCompleted);
+                }
+            });
+            
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error || 'Upload failed');
+            
+            showToast('File uploaded successfully', 'success');
+            loadFiles();
+        } catch (error) {
+            showToast(error.message, 'danger');
+        } finally {
+            progressBar.remove();
+        }
+    }
+
     uploadForm.addEventListener('submit', async function(e) {
         e.preventDefault();
         const fileInput = document.getElementById('fileInput');
-        const submitButton = this.querySelector('button[type="submit"]');
-        const originalButtonText = submitButton.innerHTML;
         
         if (!fileInput.files.length) {
             showToast('Please select a file to upload', 'warning');
             return;
         }
         
-        const file = fileInput.files[0];
-        const formData = new FormData();
-        formData.append('file', file);
+        handleFiles(fileInput.files);
         
+function createProgressBar(filename) {
+    const progressWrapper = document.createElement('div');
+    progressWrapper.className = 'progress-wrapper';
+    progressWrapper.innerHTML = `
+        <div class="d-flex justify-content-between">
+            <small>${filename}</small>
+            <small class="progress-percentage">0%</small>
+        </div>
+        <div class="progress">
+            <div class="progress-bar" role="progressbar" style="width: 0%"></div>
+        </div>
+    `;
+    document.getElementById('uploadProgress').appendChild(progressWrapper);
+    return progressWrapper;
+}
+
+function updateProgress(progressWrapper, percentage) {
+    const progressBar = progressWrapper.querySelector('.progress-bar');
+    const progressText = progressWrapper.querySelector('.progress-percentage');
+    progressBar.style.width = `${percentage}%`;
+    progressText.textContent = `${percentage}%`;
+}
         // Show loading state
         submitButton.disabled = true;
         submitButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Uploading...';
