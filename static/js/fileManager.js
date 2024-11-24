@@ -27,28 +27,46 @@ document.addEventListener('DOMContentLoaded', function() {
             });
     }
 
-    uploadForm.addEventListener('submit', function(e) {
+    uploadForm.addEventListener('submit', async function(e) {
         e.preventDefault();
         const fileInput = document.getElementById('fileInput');
-        const formData = new FormData();
+        const submitButton = this.querySelector('button[type="submit"]');
+        const originalButtonText = submitButton.innerHTML;
         
-        for (const file of fileInput.files) {
-            formData.append('file', file);
+        if (!fileInput.files.length) {
+            showToast('Please select a file to upload', 'warning');
+            return;
         }
         
-        fetch('/api/files', {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.error) {
-                alert(data.error);
-            } else {
-                loadFiles();
-                fileInput.value = '';
+        const file = fileInput.files[0];
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        // Show loading state
+        submitButton.disabled = true;
+        submitButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Uploading...';
+        
+        try {
+            const response = await fetch('/api/files', {
+                method: 'POST',
+                body: formData
+            });
+            
+            const data = await response.json();
+            
+            if (!response.ok) {
+                throw new Error(data.error || 'Upload failed');
             }
-        });
+            
+            showToast('File uploaded successfully', 'success');
+            loadFiles();
+            fileInput.value = '';
+        } catch (error) {
+            showToast(error.message, 'danger');
+        } finally {
+            submitButton.disabled = false;
+            submitButton.innerHTML = originalButtonText;
+        }
     });
 
     window.processFile = function(fileId) {

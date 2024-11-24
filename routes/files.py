@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify, render_template
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 from models import File, FileMetadata, db
+from datetime import datetime
 import os
 
 files_bp = Blueprint('files', __name__)
@@ -31,34 +32,67 @@ def list_files():
 @files_bp.route('/api/files', methods=['POST'])
 @login_required
 def upload_file():
-    if 'file' not in request.files:
-        return jsonify({'error': 'No file part'}), 400
+    try:
+        # Ensure upload directory exists
+        upload_dir = os.path.join(os.getcwd(), 'uploads')
+        os.makedirs(upload_dir, exist_ok=True)
         
-    file = request.files['file']
-    if file.filename == '':
-        return jsonify({'error': 'No selected file'}), 400
-        
-    if file and allowed_file(file.filename):
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file was uploaded'}), 400
+            
+        file = request.files['file']
+        if not file or file.filename == '':
+            return jsonify({'error': 'No file was selected'}), 400
+            
+        if not allowed_file(str(file.filename)):
+            return jsonify({'error': f'File type not allowed. Supported types: {", ".join(ALLOWED_EXTENSIONS)}'}), 400
+            
+        # Generate unique filename to prevent overwrites
         filename = secure_filename(file.filename)
-        filepath = os.path.join('uploads', filename)
-        file.save(filepath)
+        unique_filename = f"{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}_{filename}"
+        filepath = os.path.join(upload_dir, unique_filename)
         
-        new_file = File(
-            filename=filename,
-            filepath=filepath,
-            filetype=file.filename.rsplit('.', 1)[1].lower(),
-            size=os.path.getsize(filepath),
-            user_id=current_user.id
-        )
+        # Check file size (limit to 50MB)
+        file.seek(0, os.SEEK_END)
+        size = file.tell()
+        if size > 50 * 1024 * 1024:  # 50MB in bytes
+            return jsonify({'error': 'File size exceeds 50MB limit'}), 400
+        file.seek(0)
+        
+        # Save file
+        try:
+            file.save(filepath)
+        except Exception as e:
+            return jsonify({'error': f'Failed to save file: {str(e)}'}), 500
+            
+        # Create database entry
+        new_file = File()
+        new_file.filename = filename
+        new_file.filepath = filepath
+        new_file.filetype = str(file.filename).rsplit('.', 1)[1].lower()
+        new_file.size = os.path.getsize(filepath)
+        new_file.user_id = current_user.id
         db.session.add(new_file)
         db.session.commit()
         
         return jsonify({
             'id': new_file.id,
-            'filename': new_file.filename
+            'filename': new_file.filename,
+            'size': formatFileSize(new_file.size),
+            'type': new_file.filetype,
+            'created_at': new_file.created_at.isoformat()
         })
         
-    return jsonify({'error': 'Invalid file type'}), 400
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Upload failed: {str(e)}'}), 500
+
+def formatFileSize(size):
+    for unit in ['B', 'KB', 'MB', 'GB']:
+        if size < 1024:
+            return f"{size:.1f} {unit}"
+        size /= 1024
+    return f"{size:.1f} TB"
 
 @files_bp.route('/api/files/<int:file_id>', methods=['DELETE'])
 @login_required
