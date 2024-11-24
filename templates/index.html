@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 text-center mb-5">
+            <h1 class="display-4 mb-4">File Management System</h1>
+            <p class="lead">Organize, process, and analyze your files with advanced features</p>
+        </div>
+    </div>
+
+    {% if not current_user.is_authenticated %}
+    <div class="row justify-content-center mb-5">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h5 class="card-title mb-4">Get Started</h5>
+                    <div class="d-grid gap-3">
+                        <a href="{{ url_for('auth.login') }}" class="btn btn-primary">
+                            <i data-feather="log-in" class="feather me-2"></i>Login
+                        </a>
+                        <a href="{{ url_for('auth.register') }}" class="btn btn-outline-primary">
+                            <i data-feather="user-plus" class="feather me-2"></i>Register
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="row g-4">
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <i data-feather="file-text" class="feather feather-lg mb-3"></i>
+                    <h5 class="card-title">File Processing</h5>
+                    <p class="card-text">Upload and process various file types including text and audio files</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <i data-feather="mic" class="feather feather-lg mb-3"></i>
+                    <h5 class="card-title">Audio Analysis</h5>
+                    <p class="card-text">Transcribe audio files and identify different speakers</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <i data-feather="bar-chart-2" class="feather feather-lg mb-3"></i>
+                    <h5 class="card-title">Text Analysis</h5>
+                    <p class="card-text">Extract entities and analyze sentiment from text content</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if current_user.is_authenticated %}
+    <div class="row mt-5">
+        <div class="col-12 text-center">
+            <a href="{{ url_for('files.index') }}" class="btn btn-lg btn-primary">
+                <i data-feather="folder" class="feather me-2"></i>Go to File Manager
+            </a>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Features Section -->
+    <div class="row mt-5 pt-5 border-top">
+        <div class="col-12 text-center mb-4">
+            <h2>Key Features</h2>
+        </div>
+        <div class="col-md-6 col-lg-3 mb-4">
+            <div class="d-flex align-items-center">
+                <i data-feather="check-circle" class="feather text-success me-3"></i>
+                <span>Secure File Storage</span>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-3 mb-4">
+            <div class="d-flex align-items-center">
+                <i data-feather="check-circle" class="feather text-success me-3"></i>
+                <span>Speech Recognition</span>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-3 mb-4">
+            <div class="d-flex align-items-center">
+                <i data-feather="check-circle" class="feather text-success me-3"></i>
+                <span>Entity Extraction</span>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-3 mb-4">
+            <div class="d-flex align-items-center">
+                <i data-feather="check-circle" class="feather text-success me-3"></i>
+                <span>Sentiment Analysis</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast Container -->
+<div id="toast-container" class="position-fixed bottom-0 end-0 p-3"></div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+{% endblock %}

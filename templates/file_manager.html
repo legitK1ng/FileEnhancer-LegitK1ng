@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12 mb-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Upload Files</h5>
+                <form id="uploadForm" class="mb-3">
+                    <div class="input-group">
+                        <input type="file" class="form-control" id="fileInput" multiple>
+                        <button class="btn btn-primary" type="submit">Upload</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Your Files</h5>
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Filename</th>
+                                <th>Type</th>
+                                <th>Size</th>
+                                <th>Created</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="filesList"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Processing Modal -->
+<div class="modal fade" id="processingModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">File Processing Results</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <h6>Transcript</h6>
+                    <pre id="transcript" class="bg-dark p-3 rounded"></pre>
+                </div>
+                <div class="mb-3">
+                    <h6>Sentiment Analysis</h6>
+                    <div id="sentiment"></div>
+                </div>
+                <div class="mb-3">
+                    <h6>Entities</h6>
+                    <div id="entities"></div>
+                </div>
+                <div class="mb-3">
+                    <h6>Speakers</h6>
+                    <div id="speakers"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/fileManager.js"></script>
+<script src="/static/js/audioProcessor.js"></script>
+{% endblock %}
