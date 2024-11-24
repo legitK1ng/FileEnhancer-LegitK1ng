@@ -6,7 +6,12 @@ class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(64), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
-    password_hash = db.Column(db.String(256))
+    password_hash = db.Column(db.String(256), nullable=True)
+    google_id = db.Column(db.String(256), unique=True, nullable=True)
+    google_profile_pic = db.Column(db.String(512), nullable=True)
+    google_email_verified = db.Column(db.Boolean, default=False)
+    password_reset_token = db.Column(db.String(64), unique=True, nullable=True)
+    token_expiry = db.Column(db.DateTime, nullable=True)
     files = db.relationship('File', backref='owner', lazy=True)
 
 class File(db.Model):

@@ -23,8 +23,15 @@
                             <input type="checkbox" class="form-check-input" id="remember" name="remember">
                             <label class="form-check-label" for="remember">Remember me</label>
                         </div>
+                        <div class="mb-3">
+                            <a href="{{ url_for('auth.forgot_password') }}" class="text-decoration-none">Forgot Password?</a>
+                        </div>
                         <div class="d-grid gap-2">
-                            <button type="submit" class="btn btn-primary">Login</button>
+                            <button type="submit" class="btn btn-primary">Login with Email</button>
+                            <a href="{{ url_for('google_auth.google_login') }}" class="btn btn-outline-light">
+                                <img src="https://www.google.com/favicon.ico" alt="Google" class="me-2" style="width: 18px; height: 18px;">
+                                Sign in with Google
+                            </a>
                             <a href="{{ url_for('auth.register') }}" class="btn btn-outline-secondary">Register</a>
                         </div>
                     </form>
