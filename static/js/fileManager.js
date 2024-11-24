@@ -27,41 +27,6 @@ document.addEventListener('DOMContentLoaded', function() {
             });
     }
 
-    // Add drag and drop support
-    const dropZone = document.querySelector('.upload-zone');
-    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-        dropZone.addEventListener(eventName, preventDefaults, false);
-    });
-
-    function preventDefaults(e) {
-        e.preventDefault();
-        e.stopPropagation();
-    }
-
-    ['dragenter', 'dragover'].forEach(eventName => {
-        dropZone.addEventListener(eventName, () => {
-            dropZone.classList.add('dragover');
-        });
-    });
-
-    ['dragleave', 'drop'].forEach(eventName => {
-        dropZone.addEventListener(eventName, () => {
-            dropZone.classList.remove('dragover');
-        });
-    });
-
-    dropZone.addEventListener('drop', handleDrop);
-
-    function handleDrop(e) {
-        const dt = e.dataTransfer;
-        const files = dt.files;
-        handleFiles(files);
-    }
-
-    function handleFiles(files) {
-        [...files].forEach(uploadFile);
-    }
-
     async function uploadFile(file) {
         const formData = new FormData();
         formData.append('file', file);
@@ -72,11 +37,7 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             const response = await fetch('/api/files', {
                 method: 'POST',
-                body: formData,
-                onUploadProgress: (progressEvent) => {
-                    const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-                    updateProgress(progressBar, percentCompleted);
-                }
+                body: formData
             });
             
             const data = await response.json();

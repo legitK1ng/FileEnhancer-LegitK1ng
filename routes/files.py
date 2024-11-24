@@ -44,7 +44,7 @@ def upload_file():
         if not file or file.filename == '':
             return jsonify({'error': 'No file was selected'}), 400
             
-        if not allowed_file(str(file.filename)):
+        if not file.filename or not allowed_file(file.filename):
             return jsonify({'error': f'File type not allowed. Supported types: {", ".join(ALLOWED_EXTENSIONS)}'}), 400
             
         # Generate unique filename to prevent overwrites
@@ -60,14 +60,15 @@ def upload_file():
         file.seek(0)
         
         # Validate file content
-        if file.filename.lower().endswith(('.txt', '.pdf')):
+        file_ext = filename.rsplit('.', 1)[1].lower() if '.' in filename else ''
+        if file_ext in ['txt', 'pdf']:
             try:
                 content = file.read(1024)  # Read first 1KB to validate
                 file.seek(0)
                 content.decode('utf-8')  # Try to decode as text
             except UnicodeDecodeError:
                 return jsonify({'error': 'Invalid text file encoding'}), 400
-        elif file.filename.lower().endswith(('.wav', '.mp3', '.amr')):
+        elif file_ext in ['wav', 'mp3', 'amr']:
             try:
                 content = file.read(44)  # Read header
                 file.seek(0)
