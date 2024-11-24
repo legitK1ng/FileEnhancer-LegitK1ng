@@ -28,6 +28,14 @@ def create_app():
         "pool_recycle": 300,
         "pool_pre_ping": True,
     }
+    app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024 * 1024  # 10GB
+    app.config['UPLOAD_CHUNK_SIZE'] = 1024 * 1024  # 1MB chunks
+    app.config['UPLOAD_FOLDER'] = os.path.join(os.getcwd(), 'uploads')
+    app.config['TEMP_FOLDER'] = os.path.join(os.getcwd(), 'uploads', 'temp')
+    
+    # Create upload and temp directories
+    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+    os.makedirs(app.config['TEMP_FOLDER'], exist_ok=True)
     app.config["SESSION_COOKIE_SECURE"] = True
     app.config["SESSION_COOKIE_HTTPONLY"] = True
     app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=7)

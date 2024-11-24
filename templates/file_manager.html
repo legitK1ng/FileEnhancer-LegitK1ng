@@ -15,7 +15,16 @@
                         </button>
                     </div>
                 </form>
-                <div id="uploadProgress" class="mb-3"></div>
+                <div id="uploadProgress" class="mb-3">
+                    <div class="overall-progress d-none mb-3">
+                        <h6>Overall Progress</h6>
+                        <div class="progress">
+                            <div class="progress-bar" role="progressbar" style="width: 0%"></div>
+                        </div>
+                        <small class="text-muted">Uploading files: <span class="current">0</span>/<span class="total">0</span></small>
+                    </div>
+                    <div id="individualProgress"></div>
+                </div>
             </div>
         </div>
     </div>

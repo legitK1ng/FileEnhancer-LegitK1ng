@@ -29,20 +29,80 @@ def list_files():
         'created_at': f.created_at.isoformat()
     } for f in files])
 
-@files_bp.route('/api/files', methods=['POST'])
+@files_bp.route('/api/files/upload-chunk', methods=['POST'])
 @login_required
-def upload_file():
+def upload_chunk():
     try:
-        # Ensure upload directory exists
-        upload_dir = os.path.join(os.getcwd(), 'uploads')
-        os.makedirs(upload_dir, exist_ok=True)
+        chunk = request.files.get('chunk')
+        chunk_number = int(request.form.get('chunkNumber'))
+        total_chunks = int(request.form.get('totalChunks'))
+        filename = request.form.get('filename')
+        upload_id = request.form.get('uploadId')
+        file_size = int(request.form.get('fileSize'))
         
-        if 'file' not in request.files:
-            return jsonify({'error': 'No file was uploaded'}), 400
+        if not all([chunk, chunk_number is not None, total_chunks, filename, upload_id]):
+            return jsonify({'error': 'Missing required chunk upload data'}), 400
             
-        file = request.files['file']
-        if not file or file.filename == '':
-            return jsonify({'error': 'No file was selected'}), 400
+        # Validate total file size (10GB limit)
+        if file_size > 10 * 1024 * 1024 * 1024:
+            return jsonify({'error': 'File size exceeds 10GB limit'}), 400
+            
+        temp_dir = os.path.join(current_app.config['TEMP_FOLDER'], upload_id)
+        os.makedirs(temp_dir, exist_ok=True)
+        
+        chunk_file = os.path.join(temp_dir, f'chunk_{chunk_number}')
+        chunk.save(chunk_file)
+        
+        # Track upload progress
+        progress = {
+            'uploadId': upload_id,
+            'filename': filename,
+            'chunkNumber': chunk_number,
+            'totalChunks': total_chunks,
+            'progress': (chunk_number + 1) / total_chunks * 100
+        }
+        
+        # If this is the last chunk, combine all chunks
+        if chunk_number == total_chunks - 1:
+            final_filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], 
+                                        f"{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}_{secure_filename(filename)}")
+            
+            with open(final_filepath, 'wb') as final_file:
+                for i in range(total_chunks):
+                    chunk_path = os.path.join(temp_dir, f'chunk_{i}')
+                    with open(chunk_path, 'rb') as chunk_file:
+                        final_file.write(chunk_file.read())
+            
+            # Cleanup temp files
+            import shutil
+            shutil.rmtree(temp_dir)
+            
+            # Create database entry
+            new_file = File(
+                filename=filename,
+                filepath=final_filepath,
+                filetype=filename.rsplit('.', 1)[1].lower() if '.' in filename else '',
+                size=os.path.getsize(final_filepath),
+                user_id=current_user.id
+            )
+            db.session.add(new_file)
+            db.session.commit()
+            
+            return jsonify({
+                'status': 'complete',
+                'file': {
+                    'id': new_file.id,
+                    'filename': new_file.filename,
+                    'size': formatFileSize(new_file.size),
+                    'type': new_file.filetype,
+                    'created_at': new_file.created_at.isoformat()
+                }
+            })
+        
+        return jsonify({
+            'status': 'in_progress',
+            'progress': progress
+        })
             
         if not file.filename or not allowed_file(file.filename):
             return jsonify({'error': f'File type not allowed. Supported types: {", ".join(ALLOWED_EXTENSIONS)}'}), 400
