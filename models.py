@@ -12,6 +12,8 @@ class User(UserMixin, db.Model):
     google_email_verified = db.Column(db.Boolean, default=False)
     password_reset_token = db.Column(db.String(64), unique=True, nullable=True)
     token_expiry = db.Column(db.DateTime, nullable=True)
+    replit_user_id = db.Column(db.String(256), unique=True, nullable=True)
+    last_login = db.Column(db.DateTime, nullable=True)
     files = db.relationship('File', backref='owner', lazy=True)
 
 class File(db.Model):
@@ -32,3 +34,8 @@ class FileMetadata(db.Model):
     entities = db.Column(db.JSON)
     speakers = db.Column(db.JSON)
     processed_at = db.Column(db.DateTime, default=datetime.utcnow)
+    batch_id = db.Column(db.String(36), nullable=True)
+    processing_status = db.Column(db.String(20), nullable=True)
+    processing_started_at = db.Column(db.DateTime, nullable=True)
+    processing_completed_at = db.Column(db.DateTime, nullable=True)
+    processing_error = db.Column(db.Text, nullable=True)

@@ -10,33 +10,11 @@
                     {% if error %}
                     <div class="alert alert-danger">{{ error }}</div>
                     {% endif %}
-                    <form method="POST">
-                        <div class="mb-3">
-                            <label for="email" class="form-label">Email</label>
-                            <input type="email" class="form-control" id="email" name="email" required>
-                        </div>
-                        <div class="mb-3">
-                            <label for="password" class="form-label">Password</label>
-                            <input type="password" class="form-control" id="password" name="password" required>
-                        </div>
-                        <div class="mb-3 form-check">
-                            <input type="checkbox" class="form-check-input" id="remember" name="remember">
-                            <label class="form-check-label" for="remember">Remember me</label>
-                        </div>
-                        <div class="mb-3">
-                            <a href="{{ url_for('auth.forgot_password') }}" class="text-decoration-none">Forgot Password?</a>
-                        </div>
-                        <div class="d-grid gap-2">
-                            <button type="submit" class="btn btn-primary">Login with Email</button>
-                            {% if config.get('GOOGLE_OAUTH_CLIENT_ID') %}
-                            <a href="{{ url_for('google_auth.google_login') }}" class="btn btn-outline-light">
-                                <img src="https://www.google.com/favicon.ico" alt="Google" class="me-2" style="width: 18px; height: 18px;">
-                                Sign in with Google
-                            </a>
-                            {% endif %}
-                            <a href="{{ url_for('auth.register') }}" class="btn btn-outline-secondary">Register</a>
-                        </div>
-                    </form>
+                    <div class="d-grid gap-2">
+                        <a href="{{ url_for('auth.replit_auth') }}" class="btn btn-primary">
+                            <i data-feather="log-in" class="feather me-2"></i>Login with Replit
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>

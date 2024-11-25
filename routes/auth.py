@@ -1,3 +1,4 @@
+from datetime import datetime
 from flask import Blueprint, request, redirect, url_for, render_template, current_app
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -54,10 +55,34 @@ def register():
         )
         db.session.add(user)
         db.session.commit()
+@auth_bp.route('/auth/replit')
+def replit_auth():
+    replit_user_id = request.headers.get('X-Replit-User-Id')
+    replit_user_name = request.headers.get('X-Replit-User-Name')
+    
+    if not replit_user_id or not replit_user_name:
+        return jsonify({'error': 'Missing Replit authentication headers'}), 401
         
-        login_user(user)
-        return redirect(url_for('files.index'))
-        
+    # Find or create user
+    user = User.query.filter_by(replit_user_id=replit_user_id).first()
+    if not user:
+        # Create new user
+        user = User(
+            username=replit_user_name,
+            email=f"{replit_user_id}@repl.user",  # Placeholder email
+            replit_user_id=replit_user_id
+        )
+        db.session.add(user)
+    
+    # Update last login
+    user.last_login = datetime.utcnow()
+    db.session.commit()
+    
+    # Log in the user
+    login_user(user)
+    
+    return redirect(url_for('files.index'))
+
     return render_template('register.html')
 
 @auth_bp.route('/forgot-password', methods=['GET', 'POST'])
