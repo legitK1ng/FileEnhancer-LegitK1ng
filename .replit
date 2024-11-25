@@ -42,3 +42,7 @@ localPort = 5000
 
 [objectStorage]
 defaultBucketID = "replit-objstore-0acf8ce9-b77f-4944-a48b-216dae1960dc"
+
+[auth]
+pageEnabled = true
+buttonEnabled = false

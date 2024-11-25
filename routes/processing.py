@@ -7,6 +7,7 @@ from datetime import datetime
 import queue
 import threading
 import time
+import uuid
 
 processing_bp = Blueprint('processing', __name__)
 
@@ -21,12 +22,22 @@ def get_user_queue():
         processing_status[user_id] = {}
     return processing_queues[user_id], processing_status[user_id]
 
-def process_file_task(file, status_dict):
+def process_file_task(file, status_dict, batch_id=None):
     try:
+        metadata = FileMetadata.query.filter_by(file_id=file.id).first()
+        if not metadata:
+            metadata = FileMetadata(file_id=file.id)
+            db.session.add(metadata)
+        
+        metadata.batch_id = batch_id
+        metadata.processing_status = 'processing'
+        metadata.processing_started_at = datetime.utcnow()
+        db.session.commit()
+
         status_dict[file.id] = {
             'status': 'processing',
             'progress': 0,
-            'started_at': datetime.utcnow().isoformat()
+            'started_at': metadata.processing_started_at.isoformat()
         }
 
         if file.filetype in ['wav', 'mp3', 'amr']:
@@ -44,14 +55,12 @@ def process_file_task(file, status_dict):
         sentiment = analyze_sentiment(transcript)
         entities = extract_entities(transcript)
         
-        metadata = FileMetadata(
-            file_id=file.id,
-            transcript=transcript,
-            sentiment_score=sentiment['compound'],
-            entities=entities,
-            speakers=speakers
-        )
-        db.session.add(metadata)
+        metadata.transcript = transcript
+        metadata.sentiment_score = sentiment['compound']
+        metadata.entities = entities
+        metadata.speakers = speakers
+        metadata.processing_status = 'completed'
+        metadata.processing_completed_at = datetime.utcnow()
         db.session.commit()
 
         status_dict[file.id] = {
@@ -75,8 +84,8 @@ def process_file_task(file, status_dict):
 def process_queue(user_queue, status_dict):
     while True:
         try:
-            file = user_queue.get(timeout=1)
-            process_file_task(file, status_dict)
+            file, batch_id = user_queue.get(timeout=1)
+            process_file_task(file, status_dict, batch_id)
             user_queue.task_done()
         except queue.Empty:
             time.sleep(1)
@@ -91,6 +100,7 @@ def process_batch():
     if not file_ids:
         return jsonify({'error': 'No files specified'}), 400
 
+    batch_id = str(uuid.uuid4())
     user_queue, status_dict = get_user_queue()
     
     # Start processing thread if not already running
@@ -108,7 +118,7 @@ def process_batch():
     for file_id in file_ids:
         file = File.query.get(file_id)
         if file and file.user_id == current_user.id:
-            user_queue.put(file)
+            user_queue.put((file, batch_id))
             status_dict[file.id] = {
                 'status': 'queued',
                 'queued_at': datetime.utcnow().isoformat()
