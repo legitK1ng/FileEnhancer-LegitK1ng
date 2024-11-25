@@ -137,6 +137,111 @@ function updateProgress(progressWrapper, percentage) {
     };
 
     function formatFileSize(bytes) {
+    // Batch processing functionality
+    const selectAllCheckbox = document.getElementById('selectAll');
+    const processBatchBtn = document.getElementById('processBatchBtn');
+    
+    selectAllCheckbox.addEventListener('change', function() {
+        const checkboxes = document.querySelectorAll('.file-checkbox');
+        checkboxes.forEach(checkbox => {
+            checkbox.checked = this.checked;
+            if (this.checked) {
+                selectedFiles.add(parseInt(checkbox.value));
+            } else {
+                selectedFiles.clear();
+            }
+        });
+        updateProcessBatchButton();
+    });
+    
+    document.getElementById('filesList').addEventListener('change', function(e) {
+        if (e.target.classList.contains('file-checkbox')) {
+            const fileId = parseInt(e.target.value);
+            if (e.target.checked) {
+                selectedFiles.add(fileId);
+            } else {
+                selectedFiles.delete(fileId);
+                selectAllCheckbox.checked = false;
+            }
+            updateProcessBatchButton();
+        }
+    });
+    
+    function updateProcessBatchButton() {
+        processBatchBtn.disabled = selectedFiles.size === 0;
+    }
+    
+    processBatchBtn.addEventListener('click', async function() {
+        if (selectedFiles.size === 0) return;
+        
+        const batchProgress = document.getElementById('batchProgress');
+        const progressBar = batchProgress.querySelector('.progress-bar');
+        batchProgress.classList.remove('d-none');
+        progressBar.style.width = '0%';
+        
+        try {
+            const response = await fetch('/api/process/batch', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    file_ids: Array.from(selectedFiles)
+                })
+            });
+            
+            if (!response.ok) throw new Error('Failed to start batch processing');
+            
+            const result = await response.json();
+            showToast(`Started processing ${result.queued_files.length} files`, 'info');
+            
+            // Start polling for status
+            const statusInterval = setInterval(async () => {
+                const statusResponse = await fetch('/api/process/status');
+                const statusData = await statusResponse.json();
+                
+                let completed = 0;
+                let total = selectedFiles.size;
+                
+                result.queued_files.forEach(fileId => {
+                    const status = statusData[fileId];
+                    if (status) {
+                        const statusBadge = document.querySelector(`tr:has(input[value="${fileId}"]) .status-badge`);
+                        if (status.status === 'completed') {
+                            statusBadge.className = 'status-badge badge bg-success';
+                            statusBadge.textContent = 'Completed';
+                            completed++;
+                        } else if (status.status === 'failed') {
+                            statusBadge.className = 'status-badge badge bg-danger';
+                            statusBadge.textContent = 'Failed';
+                            completed++;
+                        } else if (status.status === 'processing') {
+                            statusBadge.className = 'status-badge badge bg-primary';
+                            statusBadge.textContent = 'Processing';
+                        }
+                    }
+                });
+                
+                const progress = (completed / total) * 100;
+                progressBar.style.width = `${progress}%`;
+                
+                if (completed === total) {
+                    clearInterval(statusInterval);
+                    showToast('Batch processing completed', 'success');
+                    setTimeout(() => {
+                        batchProgress.classList.add('d-none');
+                        selectedFiles.clear();
+                        selectAllCheckbox.checked = false;
+                        updateProcessBatchButton();
+                    }, 2000);
+                }
+            }, 2000);
+            
+        } catch (error) {
+            showToast(error.message, 'danger');
+            batchProgress.classList.add('d-none');
+        }
+    });
         const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
         if (bytes === 0) return '0 Byte';
         const i = parseInt(Math.floor(Math.log(bytes) / Math.log(1024)));

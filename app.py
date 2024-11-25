@@ -62,9 +62,12 @@ def create_app():
     migrate.init_app(app, db)
     
     login_manager.init_app(app)
-    login_manager.login_view = str("auth.login")  # Set login view explicitly as string
-    login_manager.login_message = str("Please log in to access this page.")
-    login_manager.login_message_category = str("info")
+    # Configure login manager
+    login_manager.login_view = "auth.login"  # type: ignore
+    login_manager.login_message = "Please log in to access this page."  # type: ignore
+    login_manager.login_message_category = "info"  # type: ignore
+    login_manager.session_protection = "strong"  # type: ignore
+    app.config['LOGIN_DISABLED'] = False
 
     with app.app_context():
         import models

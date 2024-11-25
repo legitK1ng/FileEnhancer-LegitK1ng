@@ -34,18 +34,36 @@
             <div class="card-body">
                 <h5 class="card-title">Your Files</h5>
                 <div class="table-responsive">
+                    <div class="mb-3">
+                        <button id="processBatchBtn" class="btn btn-primary" disabled>
+                            <i data-feather="cpu" class="feather-sm me-1"></i>
+                            Process Selected
+                        </button>
+                    </div>
                     <table class="table">
                         <thead>
                             <tr>
+                                <th>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="selectAll">
+                                    </div>
+                                </th>
                                 <th>Filename</th>
                                 <th>Type</th>
                                 <th>Size</th>
                                 <th>Created</th>
+                                <th>Status</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody id="filesList"></tbody>
                     </table>
+                    <div id="batchProgress" class="mt-3 d-none">
+                        <h6>Batch Processing Progress</h6>
+                        <div class="progress">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
