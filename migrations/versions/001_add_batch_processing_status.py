@@ -15,12 +15,30 @@ branch_labels = None
 depends_on = None
 
 def upgrade():
-    op.add_column('file_metadata', sa.Column('batch_id', sa.String(36), nullable=True))
-    op.add_column('file_metadata', sa.Column('processing_status', sa.String(20), nullable=True))
-    op.add_column('file_metadata', sa.Column('processing_started_at', sa.DateTime, nullable=True))
-    op.add_column('file_metadata', sa.Column('processing_completed_at', sa.DateTime, nullable=True))
-    op.add_column('file_metadata', sa.Column('processing_error', sa.Text, nullable=True))
-    op.create_index('ix_file_metadata_batch_id', 'file_metadata', ['batch_id'])
+    try:
+        # Add columns one by one with error handling
+        for column in [
+            ('batch_id', sa.String(36)),
+            ('processing_status', sa.String(20)),
+            ('processing_started_at', sa.DateTime),
+            ('processing_completed_at', sa.DateTime),
+            ('processing_error', sa.Text)
+        ]:
+            try:
+                op.add_column('file_metadata', sa.Column(column[0], column[1], nullable=True))
+            except Exception as e:
+                if "already exists" not in str(e):
+                    raise e
+                
+        # Create index if it doesn't exist
+        try:
+            op.create_index('ix_file_metadata_batch_id', 'file_metadata', ['batch_id'])
+        except Exception as e:
+            if "already exists" not in str(e):
+                raise e
+    except Exception as e:
+        if "already exists" not in str(e):
+            raise e
 
 def downgrade():
     op.drop_index('ix_file_metadata_batch_id')

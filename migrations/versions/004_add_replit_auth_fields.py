@@ -16,9 +16,13 @@ depends_on = None
 
 def upgrade():
     # Add Replit authentication columns to user table
-    op.add_column('user', sa.Column('replit_user_id', sa.String(256), unique=True, nullable=True))
-    op.add_column('user', sa.Column('last_login', sa.DateTime, nullable=True))
-    op.create_index('ix_user_replit_user_id', 'user', ['replit_user_id'], unique=True)
+    try:
+        op.add_column('user', sa.Column('replit_user_id', sa.String(256), unique=True, nullable=True))
+        op.add_column('user', sa.Column('last_login', sa.DateTime, nullable=True))
+        op.create_index('ix_user_replit_user_id', 'user', ['replit_user_id'], unique=True)
+    except Exception as e:
+        if "already exists" not in str(e):
+            raise e
 
 def downgrade():
     # Remove Replit authentication columns from user table

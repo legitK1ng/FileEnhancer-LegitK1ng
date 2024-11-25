@@ -57,31 +57,49 @@ def register():
         db.session.commit()
 @auth_bp.route('/auth/replit')
 def replit_auth():
-    replit_user_id = request.headers.get('X-Replit-User-Id')
-    replit_user_name = request.headers.get('X-Replit-User-Name')
-    
-    if not replit_user_id or not replit_user_name:
-        return jsonify({'error': 'Missing Replit authentication headers'}), 401
+    try:
+        replit_user_id = request.headers.get('X-Replit-User-Id')
+        replit_user_name = request.headers.get('X-Replit-User-Name')
+        replit_user_roles = request.headers.get('X-Replit-User-Roles')
         
-    # Find or create user
-    user = User.query.filter_by(replit_user_id=replit_user_id).first()
-    if not user:
-        # Create new user
-        user = User(
-            username=replit_user_name,
-            email=f"{replit_user_id}@repl.user",  # Placeholder email
-            replit_user_id=replit_user_id
-        )
-        db.session.add(user)
-    
-    # Update last login
-    user.last_login = datetime.utcnow()
-    db.session.commit()
-    
-    # Log in the user
-    login_user(user)
-    
-    return redirect(url_for('files.index'))
+        current_app.logger.info(f"Replit auth attempt for user: {replit_user_name}")
+        
+        if not replit_user_id or not replit_user_name:
+            current_app.logger.warning("Missing Replit authentication headers")
+            return render_template('login.html', error='Authentication failed. Please try again.'), 401
+            
+        # Find or create user
+        user = User.query.filter_by(replit_user_id=replit_user_id).first()
+        if not user:
+            current_app.logger.info(f"Creating new user for Replit user: {replit_user_name}")
+            # Check if username already exists
+            existing_user = User.query.filter_by(username=replit_user_name).first()
+            if existing_user:
+                username = f"{replit_user_name}_{replit_user_id[:6]}"
+            else:
+                username = replit_user_name
+                
+            user = User(
+                username=username,
+                email=f"{replit_user_id}@repl.user",
+                replit_user_id=replit_user_id
+            )
+            db.session.add(user)
+        
+        # Update last login
+        user.last_login = datetime.utcnow()
+        db.session.commit()
+        
+        # Log in the user
+        login_user(user)
+        current_app.logger.info(f"Successfully logged in Replit user: {user.username}")
+        
+        return redirect(url_for('files.index'))
+        
+    except Exception as e:
+        current_app.logger.error(f"Error during Replit authentication: {str(e)}")
+        db.session.rollback()
+        return render_template('login.html', error='An error occurred during authentication. Please try again.'), 500
 
     return render_template('register.html')
 
