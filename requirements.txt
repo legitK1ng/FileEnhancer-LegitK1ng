@@ -18,3 +18,16 @@ google-auth-httplib2
 google-auth-oauthlib
 oauthlib
 requests
+flask
+flask-login
+flask-sqlalchemy
+sqlalchemy
+psycopg2-binary
+nltk
+pydub
+python-dotenv
+scikit-learn
+spacy
+speechrecognition
+gunicorn
+werkzeug

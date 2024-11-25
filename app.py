@@ -1,4 +1,5 @@
 import os
+from flask_migrate import Migrate
 import os
 from datetime import timedelta
 from flask import Flask, redirect, url_for
@@ -11,6 +12,7 @@ from sqlalchemy.orm import DeclarativeBase
 
 class Base(DeclarativeBase):
     pass
+migrate = Migrate()
 
 db = SQLAlchemy(model_class=Base)
 from flask_mail import Mail
@@ -31,6 +33,9 @@ def create_app():
         "pool_pre_ping": True,
     }
     app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024 * 1024  # 10GB
+    # Allow both local and Replit domain access
+    if os.environ.get('REPLIT_DEV_DOMAIN'):
+        app.config['SERVER_NAME'] = None  # Let Flask handle the host automatically
     # Email Configuration
     app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
     app.config['MAIL_PORT'] = int(os.environ.get('MAIL_PORT', 587))
@@ -54,11 +59,12 @@ def create_app():
 
     db.init_app(app)
     mail.init_app(app)
+    migrate.init_app(app, db)
     
     login_manager.init_app(app)
-    login_manager.login_view = 'auth.login'
-    login_manager.login_message = 'Please log in to access this page.'
-    login_manager.login_message_category = 'info'
+    login_manager.login_view = str("auth.login")  # Set login view explicitly as string
+    login_manager.login_message = str("Please log in to access this page.")
+    login_manager.login_message_category = str("info")
 
     with app.app_context():
         import models
@@ -67,11 +73,14 @@ def create_app():
         from routes.auth import auth_bp
         from routes.files import files_bp
         from routes.processing import processing_bp
-        from routes.google_auth import google_bp
 
         app.register_blueprint(auth_bp)
         app.register_blueprint(files_bp)
         app.register_blueprint(processing_bp)
-        app.register_blueprint(google_bp)
+
+        # Only register Google OAuth if credentials are configured
+        if os.environ.get('GOOGLE_OAUTH_CLIENT_ID') and os.environ.get('GOOGLE_OAUTH_CLIENT_SECRET'):
+            from routes.google_auth import google_bp
+            app.register_blueprint(google_bp)
 
     return app
